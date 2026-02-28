@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Dice Game",
+      "type": "shell",
+      "command": "g++",
+      "args": [
+        "src/*.cpp",
+        "-o",
+        "DiceRunGame"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
