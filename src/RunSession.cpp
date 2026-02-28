@@ -1,6 +1,7 @@
 #include "RunSession.h"
 #include <iostream>
 #include <string>
+#include <iomanip>
 
 namespace {
 const std::string kColorRed = "\033[31m";
@@ -20,13 +21,13 @@ int getRoundTargetScore(int round) {
 void showComboList() {
     std::cout
         << "Combo List (rarity mudah -> sulit):\n"
-        << "- High Dice: 80\n"
-        << "- Doble Luck: 140\n"
-        << "- Chain: 220\n"
-        << "- Doble Chain: 260\n"
-        << "- Doble God: 300\n"
-        << "- Gembling God: 600\n"
-        << "- Golden Chain: 800\n"
+        << "- High Dice: 40\n"
+        << "- Doble Luck: 70\n"
+        << "- Chain: 110\n"
+        << "- Doble Chain: 130\n"
+        << "- Doble God: 150\n"
+        << "- Gembling God: 300\n"
+        << "- Golden Chain: 400\n"
         << "Semua combo bisa ditumpuk jika syarat terpenuhi.\n";
 }
 
@@ -36,6 +37,23 @@ bool askPlayAgain() {
     std::cin >> answer;
     return answer == 'y' || answer == 'Y';
 }
+
+void showDiceWithTypes(const std::vector<int>& dice, const DiceSystem& diceSystem) {
+    const int kCellWidth = 7;
+
+    std::cout << "\nCurrent Dice: ";
+    for (int d : dice) {
+        std::cout << std::left << std::setw(kCellWidth) << d;
+    }
+
+    std::vector<std::string> types =
+        diceSystem.getDiceTypeNames(static_cast<int>(dice.size()));
+    std::cout << "\nDice Type   : ";
+    for (const std::string& type : types) {
+        std::cout << std::left << std::setw(kCellWidth) << type;
+    }
+    std::cout << "\n";
+}
 }
 
 void RunSession::start() {
@@ -43,15 +61,13 @@ void RunSession::start() {
     bool playAgain = true;
     while (playAgain) {
         bool runLost = false;
+        int coins = 0;
 
         for(int round = 1; round <= 3; round++) {
 
             int targetScore = getRoundTargetScore(round);
             std::cout << "\n===== ROUND "
                       << round << " =====\n";
-            std::cout << "Target score round ini: "
-                      << getTargetColor(0, targetScore)
-                      << targetScore << kColorReset << "\n";
             showComboList();
 
             int rerollLeft = 3;
@@ -62,13 +78,10 @@ void RunSession::start() {
                 diceSystem.rollDice(5);
 
             while(commitLeft > 0 && totalScore < targetScore) {
-
-                std::cout << "\nCurrent Dice: ";
-                for(int d : dice)
-                    std::cout << d << " ";
+                showDiceWithTypes(dice, diceSystem);
 
                 std::cout <<
-                "\nScore Sekarang: " << totalScore
+                "Score Sekarang: " << totalScore
                 << " / " << getTargetColor(totalScore, targetScore)
                 << targetScore << kColorReset
                 << "\nCommit Left: " << commitLeft
@@ -90,7 +103,7 @@ void RunSession::start() {
                     int baseScore = result.baseScore;
 
                     int finalScore =
-                        scoringSystem.calculateScore(baseScore);
+                        scoringSystem.calculateScore(baseScore, result.comboNames);
 
                     totalScore += finalScore;
 
@@ -145,8 +158,18 @@ void RunSession::start() {
             }
 
             std::cout << "Round lolos!\n";
+            const int baseReward = 4;
+            const int actionBonus = rerollLeft + commitLeft;
+            const int totalReward = baseReward + actionBonus;
+            coins += totalReward;
 
-            shopSystem.openShop(scoringSystem);
+            std::cout << "Reward coin: " << baseReward
+                      << " (dasar) + " << actionBonus
+                      << " (sisa commit/reroll) = "
+                      << totalReward << "\n";
+            std::cout << "Total coin sekarang: " << coins << "\n";
+
+            shopSystem.openShop(scoringSystem, diceSystem, coins);
         }
 
         if (!runLost) {

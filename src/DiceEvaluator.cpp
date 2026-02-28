@@ -59,32 +59,32 @@ EvalResult DiceEvaluator::evaluate(const std::vector<int>& dice) {
 
     // Combo stackable
     if (pairGroups >= 1) {
-        totalScore += 140;
+        totalScore += 70;
         combos.push_back("Doble Luck");
     }
     if (pairGroups >= 2) {
-        totalScore += 260;
+        totalScore += 130;
         combos.push_back("Doble Chain");
     }
     if (hasChain3) {
-        totalScore += 220;
+        totalScore += 110;
         combos.push_back("Chain");
     }
     // Doble God tetap aktif walau dapat 666, 6666, dst.
     if (sixCount >= 2) {
-        totalScore += 300;
+        totalScore += 150;
         combos.push_back("Doble God");
     }
     if (isHighDice) {
-        totalScore += 80;
+        totalScore += 40;
         combos.push_back("High Dice");
     }
     if (sixCount >= 4) {
-        totalScore += 600;
+        totalScore += 300;
         combos.push_back("Gembling God");
     }
     if (isGoldenChain) {
-        totalScore += 800;
+        totalScore += 400;
         combos.push_back("Golden Chain");
     }
 
