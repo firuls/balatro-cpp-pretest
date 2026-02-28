@@ -1,6 +1,5 @@
 #include "DiceEvaluator.h"
 #include <map>
-#include <iostream>
 #include <algorithm>
 #include <set>
 
@@ -27,13 +26,13 @@ EvalResult DiceEvaluator::evaluate(const std::vector<int>& dice) {
         }
     }
 
-    bool isHighDice = true;
+    int highDiceCount = 0;
     for (int d : dice) {
-        if (d != 5 && d != 6) {
-            isHighDice = false;
-            break;
+        if (d == 5 || d == 6) {
+            highDiceCount++;
         }
     }
+    bool isHighDice = (highDiceCount == 1);
 
     std::set<int> uniqueValues(dice.begin(), dice.end());
     std::vector<int> uniqueSorted(uniqueValues.begin(), uniqueValues.end());
@@ -77,7 +76,7 @@ EvalResult DiceEvaluator::evaluate(const std::vector<int>& dice) {
         combos.push_back("Doble God");
     }
     if (isHighDice) {
-        totalScore += 420;
+        totalScore += 80;
         combos.push_back("High Dice");
     }
     if (sixCount >= 4) {
@@ -90,18 +89,8 @@ EvalResult DiceEvaluator::evaluate(const std::vector<int>& dice) {
     }
 
     if (combos.empty()) {
-        std::cout << "No combo\n";
         return {60, {"No Combo"}};
     }
-
-    std::cout << "Combo stack: ";
-    for (size_t i = 0; i < combos.size(); ++i) {
-        std::cout << combos[i];
-        if (i + 1 < combos.size()) {
-            std::cout << ", ";
-        }
-    }
-    std::cout << "\n";
 
     return {totalScore, combos};
 }
