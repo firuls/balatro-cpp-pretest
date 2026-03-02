@@ -3,18 +3,27 @@
 #include <iostream>
 #include <vector>
 
+int DiceSystem::rollValueForSlot(int slotIndex) const {
+    std::string typeName = getDiceTypeNameAt(slotIndex);
+    if (typeName == "dodeca") {
+        return rand() % 12 + 1;
+    }
+    return rand() % 6 + 1;
+}
+
 std::vector<int> DiceSystem::rollDice(int count) {
     std::vector<int> dice;
 
-    for(int i=0;i<count;i++)
-        dice.push_back(rand()%6+1);
+    for (int i = 0; i < count; i++) {
+        dice.push_back(rollValueForSlot(i));
+    }
 
     return dice;
 }
 
 void DiceSystem::rerollDice(std::vector<int>& dice) {
 
-    std::cout << "Choose dice index to reroll (1-5, 0 stop): ";
+    std::cout << "Choose dice index to reroll (1-" << dice.size() << ", 0 stop): ";
 
     while(true){
         int idx;
@@ -23,7 +32,7 @@ void DiceSystem::rerollDice(std::vector<int>& dice) {
         if(idx == 0) break;
 
         if(idx >= 1 && idx <= static_cast<int>(dice.size())){
-            dice[idx-1] = rand()%6+1;
+            dice[idx-1] = rollValueForSlot(idx - 1);
 
             for (auto& mod : diceModifiers) {
                 mod->onDiceRerolled(dice, idx - 1);
@@ -55,6 +64,45 @@ std::vector<std::string> DiceSystem::getDiceTypeNames(int count) const {
     }
 
     return result;
+}
+
+std::string DiceSystem::getDiceTypeNameAt(int slotIndex) const {
+    if (slotIndex >= 0 && slotIndex < static_cast<int>(diceTypeNames.size())) {
+        return diceTypeNames[slotIndex];
+    }
+    return "norml";
+}
+
+int DiceSystem::calculateDiceValueScore(const std::vector<int>& dice) const {
+    std::vector<int> perSlotScore;
+    perSlotScore.reserve(dice.size());
+
+    for (int i = 0; i < static_cast<int>(dice.size()); ++i) {
+        int score = dice[i];
+        if (getDiceTypeNameAt(i) == "dodeca") {
+            score *= 2;
+        }
+        perSlotScore.push_back(score);
+    }
+
+    for (int i = 0; i < static_cast<int>(dice.size()); ++i) {
+        if (getDiceTypeNameAt(i) != "hell") {
+            continue;
+        }
+
+        if (i - 1 >= 0) {
+            perSlotScore[i - 1] *= 3;
+        }
+        if (i + 1 < static_cast<int>(perSlotScore.size())) {
+            perSlotScore[i + 1] *= 3;
+        }
+    }
+
+    int total = 0;
+    for (int score : perSlotScore) {
+        total += score;
+    }
+    return total;
 }
 
 void DiceSystem::listDiceModifiers() const {

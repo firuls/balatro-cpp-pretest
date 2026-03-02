@@ -29,6 +29,8 @@ const std::map<std::string, int> kComboBaseScore = {
 const int kDoubleScorePrice = 9;
 const int kFlatBonusPrice = 5;
 const int kGlassDicePrice = 7;
+const int kHellDicePrice = 8;
+const int kDodecaDicePrice = 10;
 
 int getComboBuffPrice(const std::string& comboName, int currentLevel) {
     auto it = kComboBaseScore.find(comboName);
@@ -48,6 +50,34 @@ bool buyWithCoins(int& coins, int price) {
     coins -= price;
     return true;
 }
+
+int installDiceTypeBySlot(DiceSystem& diceSystem, int& coins, int price, const std::string& typeName, const std::string& label) {
+    if (!buyWithCoins(coins, price)) {
+        std::cout << "Coin tidak cukup.\n";
+        return -1;
+    }
+
+    std::cout << "Pilih slot " << label << " (1-5): ";
+    int slot;
+    std::cin >> slot;
+
+    if (slot < 1 || slot > 5) {
+        coins += price;
+        std::cout << "Slot tidak valid.\n";
+        return -1;
+    }
+
+    if (diceSystem.getDiceTypeNameAt(slot - 1) != "norml") {
+        coins += price;
+        std::cout << "Slot sudah terisi tipe lain.\n";
+        return -1;
+    }
+
+    diceSystem.setDiceTypeName(slot - 1, typeName);
+    std::cout << label << " terpasang di slot " << slot
+              << ". Sisa coin: " << coins << "\n";
+    return slot - 1;
+}
 }
 
 void ShopSystem::openShop(ScoringSystem& scoringSystem, DiceSystem& diceSystem, int& coins) {
@@ -58,6 +88,8 @@ void ShopSystem::openShop(ScoringSystem& scoringSystem, DiceSystem& diceSystem, 
     std::cout << "3. Buff Combo (Lv. max 5)\n";
     std::cout << "4. Dice Kaca (Glass Dice Modifier, "
               << kGlassDicePrice << " coin)\n";
+    std::cout << "5. Hell Dice (" << kHellDicePrice << " coin)\n";
+    std::cout << "6. Dodeca Dice (" << kDodecaDicePrice << " coin)\n";
     std::cout << "0. Skip\n";
     std::cout << "Combo Buff Aktif:\n";
     scoringSystem.listComboBuffs();
@@ -122,23 +154,14 @@ void ShopSystem::openShop(ScoringSystem& scoringSystem, DiceSystem& diceSystem, 
             }
         }
     } else if (choice == 4) {
-        if (!buyWithCoins(coins, kGlassDicePrice)) {
-            std::cout << "Coin tidak cukup.\n";
-            return;
+        const int slotIndex =
+            installDiceTypeBySlot(diceSystem, coins, kGlassDicePrice, "glass", "Glass Dice");
+        if (slotIndex >= 0) {
+            diceSystem.addDiceModifier(std::make_unique<GlassDiceModifier>(slotIndex));
         }
-
-        std::cout << "Pilih slot dice kaca (1-5): ";
-        int slot;
-        std::cin >> slot;
-
-        if (slot >= 1 && slot <= 5) {
-            diceSystem.addDiceModifier(std::make_unique<GlassDiceModifier>(slot - 1));
-            diceSystem.setDiceTypeName(slot - 1, "glass");
-            std::cout << "Glass Dice terpasang di slot " << slot
-                      << ". Sisa coin: " << coins << "\n";
-        } else {
-            coins += kGlassDicePrice;
-            std::cout << "Slot tidak valid.\n";
-        }
+    } else if (choice == 5) {
+        installDiceTypeBySlot(diceSystem, coins, kHellDicePrice, "hell", "Hell Dice");
+    } else if (choice == 6) {
+        installDiceTypeBySlot(diceSystem, coins, kDodecaDicePrice, "dodeca", "Dodeca Dice");
     }
 }
