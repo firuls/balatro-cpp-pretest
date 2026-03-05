@@ -48,49 +48,71 @@ EvalResult DiceEvaluator::evaluate(const std::vector<int>& dice) {
     }
 
     int pairGroups = 0;
+    int maxSameCount = 0;
     for (const auto& entry : counts) {
         if (entry.second >= 2) {
             pairGroups++;
         }
+        if (entry.second > maxSameCount) {
+            maxSameCount = entry.second;
+        }
     }
 
     int totalScore = 0;
+    double totalMultiplier = 1.0;
     std::vector<std::string> combos;
 
     // Combo stackable
     if (pairGroups >= 1) {
-        totalScore += 70;
+        totalScore += 8;
+        totalMultiplier = std::max(totalMultiplier, 2.0);
         combos.push_back("Doble Luck");
     }
     if (pairGroups >= 2) {
-        totalScore += 130;
+        totalScore += 15;
+        totalMultiplier = std::max(totalMultiplier, 4.0);
         combos.push_back("Doble Chain");
     }
     if (hasChain3) {
-        totalScore += 110;
+        totalScore += 10;
+        totalMultiplier = std::max(totalMultiplier, 3.0);
         combos.push_back("Chain");
     }
     // Doble God tetap aktif walau dapat 666, 6666, dst.
     if (sixCount >= 2) {
-        totalScore += 150;
+        totalScore += 20;
+        totalMultiplier = std::max(totalMultiplier, 5.0);
         combos.push_back("Doble God");
     }
     if (isHighDice) {
-        totalScore += 40;
+        totalScore += 4;
+        totalMultiplier = std::max(totalMultiplier, 1.0);
         combos.push_back("High Dice");
     }
+    if (maxSameCount >= 3) {
+        totalScore += 30;
+        totalMultiplier = std::max(totalMultiplier, 4.0);
+        combos.push_back("Triple Mirror");
+    }
+    if (maxSameCount >= 4) {
+        totalScore += 40;
+        totalMultiplier = std::max(totalMultiplier, 6.0);
+        combos.push_back("Mirror God");
+    }
     if (sixCount >= 4) {
-        totalScore += 300;
+        totalScore += 45;
+        totalMultiplier = std::max(totalMultiplier, 8.0);
         combos.push_back("Gembling God");
     }
     if (isGoldenChain) {
-        totalScore += 400;
+        totalScore += 50;
+        totalMultiplier = std::max(totalMultiplier, 10.0);
         combos.push_back("Golden Chain");
     }
 
     if (combos.empty()) {
-        return {60, {"No Combo"}};
+        return {60, 1.0, {"No Combo"}};
     }
 
-    return {totalScore, combos};
+    return {totalScore, totalMultiplier, combos};
 }

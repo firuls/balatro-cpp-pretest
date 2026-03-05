@@ -4,11 +4,15 @@
 #include <vector>
 
 int DiceSystem::rollValueForSlot(int slotIndex) const {
-    std::string typeName = getDiceTypeNameAt(slotIndex);
-    if (typeName == "dodeca") {
-        return rand() % 12 + 1;
+    int sides = 6;
+    for (const auto& mod : diceModifiers) {
+        sides = mod->getRollSidesForSlot(slotIndex, sides);
     }
-    return rand() % 6 + 1;
+    int value = rand() % sides + 1;
+    for (const auto& mod : diceModifiers) {
+        value = mod->adjustRolledValueForSlot(slotIndex, value, sides);
+    }
+    return value;
 }
 
 std::vector<int> DiceSystem::rollDice(int count) {
@@ -78,24 +82,11 @@ int DiceSystem::calculateDiceValueScore(const std::vector<int>& dice) const {
     perSlotScore.reserve(dice.size());
 
     for (int i = 0; i < static_cast<int>(dice.size()); ++i) {
-        int score = dice[i];
-        if (getDiceTypeNameAt(i) == "dodeca") {
-            score *= 2;
-        }
-        perSlotScore.push_back(score);
+        perSlotScore.push_back(dice[i]);
     }
 
-    for (int i = 0; i < static_cast<int>(dice.size()); ++i) {
-        if (getDiceTypeNameAt(i) != "hell") {
-            continue;
-        }
-
-        if (i - 1 >= 0) {
-            perSlotScore[i - 1] *= 3;
-        }
-        if (i + 1 < static_cast<int>(perSlotScore.size())) {
-            perSlotScore[i + 1] *= 3;
-        }
+    for (const auto& mod : diceModifiers) {
+        mod->applyScoreEffects(perSlotScore, dice);
     }
 
     int total = 0;
@@ -103,6 +94,14 @@ int DiceSystem::calculateDiceValueScore(const std::vector<int>& dice) const {
         total += score;
     }
     return total;
+}
+
+double DiceSystem::calculateFinalScoreMultiplier(const std::vector<int>& dice) const {
+    double multiplier = 1.0;
+    for (const auto& mod : diceModifiers) {
+        multiplier *= mod->getFinalScoreMultiplier(dice);
+    }
+    return multiplier;
 }
 
 void DiceSystem::listDiceModifiers() const {

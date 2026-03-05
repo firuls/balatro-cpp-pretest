@@ -18,5 +18,6 @@ public:
     std::vector<std::string> getDiceTypeNames(int count) const;
     std::string getDiceTypeNameAt(int slotIndex) const;
     int calculateDiceValueScore(const std::vector<int>& dice) const;
+    double calculateFinalScoreMultiplier(const std::vector<int>& dice) const;
     void listDiceModifiers() const;
 };

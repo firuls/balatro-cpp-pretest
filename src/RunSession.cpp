@@ -1,14 +1,37 @@
 #include "RunSession.h"
+#include "BossSystem.h"
 #include <iostream>
 #include <string>
 #include <iomanip>
 #include <algorithm>
-#include <cstdlib>
+#include <cmath>
+#include <sstream>
 
 namespace {
 const std::string kColorRed = "\033[31m";
 const std::string kColorGreen = "\033[32m";
 const std::string kColorReset = "\033[0m";
+
+struct HandScoreBreakdown {
+    EvalResult evalResult;
+    int diceValueScore = 0;
+    int scoreBeforeMultiplier = 0;
+    double totalMultiplier = 1.0;
+    int finalScore = 0;
+};
+
+std::string formatMultiplier(double value) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << value;
+    std::string out = oss.str();
+    while (!out.empty() && out.back() == '0') {
+        out.pop_back();
+    }
+    if (!out.empty() && out.back() == '.') {
+        out.pop_back();
+    }
+    return out;
+}
 
 std::string getTargetColor(int totalScore, int targetScore) {
     return totalScore >= targetScore ? kColorGreen : kColorRed;
@@ -21,18 +44,38 @@ int getRoundTargetScore(int round) {
     return 900;
 }
 
-void showComboList() {
-    std::cout
-        << "Combo List (rarity mudah -> sulit):\n"
-        << "- High Dice: 40\n"
-        << "- Doble Luck: 70\n"
-        << "- Chain: 110\n"
-        << "- Doble Chain: 130\n"
-        << "- Doble God: 150\n"
-        << "- Gembling God: 300\n"
-        << "- Golden Chain: 400\n"
-        << "Semua combo bisa ditumpuk jika syarat terpenuhi.\n"
-        << "Nilai angka dadu juga jadi poin dasar setiap commit.\n";
+void showComboList(const ScoringSystem& scoringSystem) {
+    struct ComboInfo {
+        const char* name;
+        int baseScore;
+        double multiplier;
+        const char* howToGet;
+    };
+
+    const ComboInfo combos[] = {
+        {"High Dice", 4, 1, "tepat 1 dadu bernilai 5 atau 6"},
+        {"Doble Luck", 8, 2, "minimal 1 pasang angka sama"},
+        {"Chain", 10, 3, "ada urutan 3 angka berurutan (contoh 2-3-4)"},
+        {"Triple Mirror", 30, 4, "minimal 3 dadu dengan angka sama"},
+        {"Doble Chain", 15, 4, "minimal 2 pasang angka sama"},
+        {"Doble God", 20, 5, "minimal 2 dadu angka 6"},
+        {"Mirror God", 40, 6, "minimal 4 dadu dengan angka sama"},
+        {"Gembling God", 45, 8, "minimal 4 dadu angka 6"},
+        {"Golden Chain", 50, 10, "5 dadu berurutan (straight penuh)"}
+    };
+
+    std::cout << "Combo List (rarity mudah -> sulit):\n";
+    for (const ComboInfo& combo : combos) {
+        const int level = scoringSystem.getComboBuffLevel(combo.name);
+        const double currentScore = ComboLevelModifier::scaleByLevel(combo.baseScore, level);
+        const double currentMulti = ComboLevelModifier::scaleByLevel(combo.multiplier, level);
+        std::cout << "- " << combo.name
+                  << ": " << static_cast<int>(std::round(currentScore))
+                  << ", Multi " << formatMultiplier(currentMulti)
+                  << " | Cara dapat: " << combo.howToGet;
+        std::cout << " | Buff Lv." << level;
+        std::cout << "\n";
+    }
 }
 
 bool askPlayAgain() {
@@ -42,46 +85,11 @@ bool askPlayAgain() {
     return answer == 'y' || answer == 'Y';
 }
 
-struct BossRoundConfig {
-    int diceCount = 5;
-    int targetScore = -1;
-    int commitLeft = 3;
-    int rerollLeft = 3;
-    int handPenalty = 0;
-    std::string effectName;
-    std::string effectDesc;
-};
-
-BossRoundConfig buildBossRoundConfig(int maxCommitScore) {
-    BossRoundConfig config;
-    const int effectId = rand() % 5;
-
-    if (effectId == 0) {
-        config.diceCount = 4;
-        config.effectName = "Dice Shredder";
-        config.effectDesc = "1 dadu dihapus. Kamu main dengan 4 dadu.";
-    } else if (effectId == 1) {
-        config.targetScore = std::max(300, maxCommitScore * 2);
-        config.effectName = "Score Mirror";
-        config.effectDesc = "Target score jadi 2x commit score terbesar yang pernah kamu dapatkan.";
-    } else if (effectId == 2) {
-        config.commitLeft = 2;
-        config.effectName = "Commit Seal";
-        config.effectDesc = "Commit dikunci jadi hanya 2 kali.";
-    } else if (effectId == 3) {
-        config.rerollLeft = 1;
-        config.effectName = "Reroll Jam";
-        config.effectDesc = "Reroll dikunci jadi hanya 1 kali.";
-    } else {
-        config.handPenalty = 50;
-        config.effectName = "Cursed Tax";
-        config.effectDesc = "Setiap commit kena penalty score -50.";
-    }
-
-    return config;
-}
-
-void showDiceWithTypes(const std::vector<int>& dice, const DiceSystem& diceSystem) {
+void showDiceWithTypes(
+    const std::vector<int>& dice,
+    const DiceSystem& diceSystem,
+    const std::string& comboText
+) {
     const int kCellWidth = 7;
 
     std::cout << "\nCurrent Dice: ";
@@ -94,6 +102,54 @@ void showDiceWithTypes(const std::vector<int>& dice, const DiceSystem& diceSyste
     std::cout << "\nDice Type   : ";
     for (const std::string& type : types) {
         std::cout << std::left << std::setw(kCellWidth) << type;
+    }
+    std::cout << "\nCombo      : " << kColorGreen << comboText << kColorReset << "\n";
+}
+
+std::string joinComboNames(const std::vector<std::string>& comboNames) {
+    std::string comboText;
+    for (size_t i = 0; i < comboNames.size(); ++i) {
+        comboText += comboNames[i];
+        if (i + 1 < comboNames.size()) {
+            comboText += ", ";
+        }
+    }
+    return comboText;
+}
+
+HandScoreBreakdown evaluateHand(
+    DiceEvaluator& evaluator,
+    const DiceSystem& diceSystem,
+    ScoringSystem& scoringSystem,
+    const std::vector<int>& dice,
+    int handPenalty
+) {
+    HandScoreBreakdown breakdown;
+    breakdown.evalResult = scoringSystem.applyComboUpgrade(evaluator.evaluate(dice));
+    breakdown.diceValueScore = diceSystem.calculateDiceValueScore(dice);
+    const double diceFinalMultiplier = diceSystem.calculateFinalScoreMultiplier(dice);
+
+    const int baseScore = breakdown.evalResult.baseScore + breakdown.diceValueScore;
+    breakdown.scoreBeforeMultiplier =
+        scoringSystem.calculateScore(baseScore, breakdown.evalResult.comboNames);
+    breakdown.totalMultiplier = breakdown.evalResult.totalMultiplier * diceFinalMultiplier;
+    const double rawFinalScore =
+        (static_cast<double>(breakdown.scoreBeforeMultiplier) * breakdown.totalMultiplier) - handPenalty;
+    breakdown.finalScore =
+        std::max(0, static_cast<int>(std::round(rawFinalScore)));
+    return breakdown;
+}
+
+void showRealtimeComboPreview(
+    int previewScoreBeforeMultiplier,
+    double previewMultiplier,
+    int handPenalty
+) {
+    std::cout << "Preview Score (belum di multi): "
+              << previewScoreBeforeMultiplier << "\n";
+    std::cout << "Preview Multi: x" << formatMultiplier(previewMultiplier);
+    if (handPenalty > 0) {
+        std::cout << " (penalty diterapkan saat final score)";
     }
     std::cout << "\n";
 }
@@ -132,7 +188,7 @@ void RunSession::start() {
             } else {
                 std::cout << "\n===== ROUND "
                           << round << " =====\n";
-                showComboList();
+                showComboList(scoringSystem);
             }
 
             int totalScore = 0;
@@ -141,7 +197,18 @@ void RunSession::start() {
                 diceSystem.rollDice(diceCount);
 
             while(commitLeft > 0 && totalScore < targetScore) {
-                showDiceWithTypes(dice, diceSystem);
+                const HandScoreBreakdown preview =
+                    evaluateHand(evaluator, diceSystem, scoringSystem, dice, handPenalty);
+                showDiceWithTypes(
+                    dice,
+                    diceSystem,
+                    joinComboNames(preview.evalResult.comboNames)
+                );
+                showRealtimeComboPreview(
+                    preview.scoreBeforeMultiplier,
+                    preview.totalMultiplier,
+                    handPenalty
+                );
 
                 std::cout <<
                 "Score Sekarang: " << totalScore
@@ -164,40 +231,15 @@ void RunSession::start() {
                 std::cin >> choice;
 
                 if(choice == 1) {
-                    EvalResult result =
-                        evaluator.evaluate(dice);
-                    const int diceValueScore = diceSystem.calculateDiceValueScore(dice);
-                    const int comboBaseScore = result.baseScore;
-                    const int baseScore = comboBaseScore + diceValueScore;
+                    const HandScoreBreakdown hand =
+                        evaluateHand(evaluator, diceSystem, scoringSystem, dice, handPenalty);
 
-                    const int modifiedScore =
-                        scoringSystem.calculateScore(baseScore, result.comboNames);
-                    const int finalScore = std::max(0, modifiedScore - handPenalty);
-
-                    totalScore += finalScore;
-                    if (finalScore > maxCommitScore) {
-                        maxCommitScore = finalScore;
+                    totalScore += hand.finalScore;
+                    if (hand.finalScore > maxCommitScore) {
+                        maxCommitScore = hand.finalScore;
                     }
 
-                    std::string comboText;
-                    for (size_t i = 0; i < result.comboNames.size(); ++i) {
-                        comboText += result.comboNames[i];
-                        if (i + 1 < result.comboNames.size()) {
-                            comboText += ", ";
-                        }
-                    }
-
-                    std::cout <<
-                    kColorGreen << "Combo: " << comboText << kColorReset << "\n"
-                    <<
-                    "Poin Nilai Dadu: "
-                    << diceValueScore << "\n"
-                    <<
-                    "Poin Combo: "
-                    << comboBaseScore << "\n"
-                    <<
-                    "Hand Score: "
-                    << finalScore;
+                    std::cout << "Final Score: " << hand.finalScore;
                     if (handPenalty > 0) {
                         std::cout << " (setelah penalty -" << handPenalty << ")";
                     }

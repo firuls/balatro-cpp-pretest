@@ -4,6 +4,7 @@
 
 struct EvalResult {
     int baseScore;
+    double totalMultiplier;
     std::vector<std::string> comboNames;
 };
 

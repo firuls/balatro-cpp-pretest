@@ -1,5 +1,6 @@
 #include "ScoringSystem.h"
 #include <iostream>
+#include <cmath>
 
 void ScoringSystem::addModifier(std::unique_ptr<IModifier> mod) {
     modifiers.push_back(std::move(mod));
@@ -16,13 +17,39 @@ int ScoringSystem::calculateScore(int baseScore) {
 }
 
 int ScoringSystem::calculateScore(int baseScore, const std::vector<std::string>& comboNames) {
-    int comboBuffBonus = 0;
+    (void)comboNames;
+    return calculateScore(baseScore);
+}
 
-    for (const auto& comboMod : comboLevelModifiers) {
-        comboBuffBonus += comboMod->getBonusIfActive(comboNames);
+EvalResult ScoringSystem::applyComboUpgrade(const EvalResult& evalResult) const {
+    if (evalResult.comboNames.size() == 1 && evalResult.comboNames[0] == "No Combo") {
+        return evalResult;
     }
 
-    return calculateScore(baseScore + comboBuffBonus);
+    double upgradedScore = 0.0;
+    double upgradedMultiplier = 1.0;
+
+    for (const std::string& comboName : evalResult.comboNames) {
+        double baseScore = 0.0;
+        double baseMulti = 1.0;
+        if (!ComboLevelModifier::getBaseComboStats(comboName, baseScore, baseMulti)) {
+            continue;
+        }
+
+        const int level = getComboBuffLevel(comboName);
+        const double adjustedScore = ComboLevelModifier::scaleByLevel(baseScore, level);
+        const double adjustedMulti = ComboLevelModifier::scaleByLevel(baseMulti, level);
+
+        upgradedScore += adjustedScore;
+        if (adjustedMulti > upgradedMultiplier) {
+            upgradedMultiplier = adjustedMulti;
+        }
+    }
+
+    EvalResult upgraded = evalResult;
+    upgraded.baseScore = static_cast<int>(std::round(upgradedScore));
+    upgraded.totalMultiplier = upgradedMultiplier;
+    return upgraded;
 }
 
 int ScoringSystem::addOrUpgradeComboBuff(const std::string& comboName) {
